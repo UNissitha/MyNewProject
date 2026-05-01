@@ -9,8 +9,15 @@ on:
   pull_request_review:
     types: [submitted]
 
+
+defaults:
+  run:
+    working-directory: ./MyNewProject
 jobs:
   claude:
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
+    
     if: |
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
@@ -31,8 +38,10 @@ jobs:
 
       - name: Project Setup
         run: |
+         npm install
          npm run setup
          npm run dev:daemon
+         sleep 10 # Wait for the server to start
 
       - name: Run Claude Code
         id: claude
