@@ -1,52 +1,44 @@
-name: Claude Code Review
+name: Claude Code Action
 
 on:
-  pull_request:
+  issues:
+    types: [opened]
   issue_comment:
     types: [created]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
 jobs:
-  claude-review:
+  claude:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      pull-requests: write
-      issues: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Project Setup
+      - name: Configure Git
         run: |
-          npm run setup
-          npm run dev:daemon
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
 
-      - name: Run Claude Code
+      - name: Run Claude Code Action
         uses: anthropics/claude-code-action@beta
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           direct_prompt: |
-            The project is already set up with all dependencies installed.
-            The server is already running at localhost:3000. Logs from it
-            are being written to logs.txt. If needed, you can query the
-            db with the sqlite3 cli. If needed, use the mcp__playwright
-            set of tools to launch a browser and interact with the app.
+            Analyze the repository and summarize the changes.
           mcp_config: |
             {
               "mcpServers": {
-                "playwright": {
+                "myServer": {
                   "command": "npx",
-                  "args": [
-                    "@playwright/mcp@latest",
-                    "--allowed-origins",
-                    "localhost:3000;cdn.tailwindcss.com;esm.sh"
-                  ]
+                  "args": ["-y", "@my/mcp-server"]
                 }
               }
             }
-          allowed_tools: "Bash(npm:*),Bash(sqlite3:*),mcp__playwright__browser_snapshot,mcp__playwright__browser_click,..."
+          allowed_tools: "bash,read_file"
