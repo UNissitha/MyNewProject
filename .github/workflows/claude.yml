@@ -26,19 +26,22 @@ jobs:
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
 
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Clear action cache
+        run: |
+          rm -rf /home/runner/work/_actions/anthropics/claude-code-action || true
+
       - name: Run Claude Code Action
-        uses: anthropics/claude-code-action@beta
+        uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          direct_prompt: |
-            Analyze the repository and summarize the changes.
-          mcp_config: |
-            {
-              "mcpServers": {
-                "myServer": {
-                  "command": "npx",
-                  "args": ["-y", "@my/mcp-server"]
-                }
-              }
-            }
-          allowed_tools: "bash,read_file"
+          prompt: |
+            The project is already set up with all dependencies installed.
+            The server is already running at localhost:3000. Logs from it
+            are being written to logs.txt. If needed, you can query the
+            db with the 'sqlite3' cli. If needed, use the mcp__playwright
+            set of tools to launch a browser and interact with the app.
