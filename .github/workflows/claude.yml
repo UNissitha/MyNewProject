@@ -1,68 +1,58 @@
-name: Claude Code
+name: Claude Code Review
+
 on:
+  pull_request:
   issue_comment:
     types: [created]
-  issues:
-    types: [opened, assigned]
-  workflow_dispatch: 
 
 jobs:
-  claude:
-    # Only run if '@claude' is mentioned or if manually triggered
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'issues' && contains(github.event.issue.body, '@claude'))
-    
+  claude-review:
     runs-on: ubuntu-latest
-    
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
-    
+
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
       issues: write
-      id-token: write  # Required for the OIDC handshake
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
+
+      - name: Install dependencies
+        run: npm install
 
       - name: Project Setup
-        # We manually enter the subfolder to install and start the server
         run: |
-          cd MyNewProject
-          npm install
           npm run setup
-          npm run dev:daemon &
-          sleep 10
+          npm run dev:daemon
+
+      - name: Write MCP config
+        run: |
+          cat > /tmp/mcp-config.json << 'MCPEOF'
+          {
+            "mcpServers": {
+              "playwright": {
+                "command": "npx",
+                "args": [
+                  "@playwright/mcp@latest",
+                  "--allowed-origins",
+                  "localhost:3000;cdn.tailwindcss.com;esm.sh"
+                ]
+              }
+            }
+          }
+          MCPEOF
 
       - name: Run Claude Code
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          # --directory tells Claude where the code lives
-          # --debug helps you see what's happening if it fails
-          claude_args: "--directory ./MyNewProject --debug"
           prompt: |
-            The project is located in the MyNewProject folder.
-            A development server is running at localhost:3000.
-            Please review the task and provide a fix.
-            mcp_config: |
-               {
-               "mcpServers": {
-                    "playwright": {
-                   "command": "npx",
-                  "args": [
-                    "@playwright/mcp@latest",
-                    "--allowed-origins",
-                     "localhost:3000;cdn.tailwindcss.com;esm.sh"
-                       ]
-                     }
-                 }
-           
-                }
-            allowed_tools: "Bash(npm:*),Bash(sqlite3:*),mcp__playwright__browser_snapshot,mcp__playwright__browser_click,..."
+            The project is already set up with all dependencies installed.
+            The server is already running at localhost:3000. Logs from it
+            are being written to logs.txt. If needed, you can query the
+            db with the 'sqlite3' cli. If needed, use the mcp__playwright
+            set of tools to launch a browser and interact with the app.
+          claude_args: >-
+            --mcp-config /tmp/mcp-config.json
+            --allowedTools "Bash(npm:*),Bash(sqlite3:*),mcp__playwright__browser_snapshot,mcp__playwright__browser_click,..."
